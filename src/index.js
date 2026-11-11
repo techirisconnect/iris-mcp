@@ -10,6 +10,7 @@ import { registerWorkDrive } from "./tools/workdrive.js";
 import { registerDb } from "./tools/db.js";
 import { registerSign } from "./tools/sign.js";
 import { registerProjects } from "./tools/projects.js";
+import { auditServer, registerAuditQuery } from "./audit.js";
 
 // Load .env next to the package (quiet: stdout is reserved for the MCP protocol).
 dotenv.config({
@@ -17,8 +18,11 @@ dotenv.config({
   quiet: true,
 });
 
-export function createServer() {
-  const server = new McpServer({ name: "iris", version: "0.1.0" });
+/** opts: { user, sinks } — user comes from the authenticated session once the server is remote. */
+export function createServer(opts = {}) {
+  const server = new McpServer({ name: "iris", version: "0.2.0" });
+  const audit = auditServer(server, opts); // must run before any registerTool
+  registerAuditQuery(server, audit);
   registerCrm(server);
   registerCliq(server);
   registerWorkDrive(server);

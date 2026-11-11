@@ -4,9 +4,16 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createServer } from "../src/index.js";
 
-async function connect() {
+// Keep test runs out of the real audit log.
+const memorySink = (rows = []) => ({
+  name: "memory", rows,
+  write: async (e) => { rows.push(e); },
+  query: async () => rows.slice().reverse(),
+});
+
+async function connect(opts = { sinks: [memorySink()], user: "tester" }) {
   const [a, b] = InMemoryTransport.createLinkedPair();
-  await createServer().connect(b);
+  await createServer(opts).connect(b);
   const client = new Client({ name: "test", version: "0" });
   await client.connect(a);
   return client;
@@ -16,6 +23,7 @@ test("exposes the CRM, Cliq, WorkDrive, DB, Sign and Projects tools", async () =
   const { tools } = await (await connect()).listTools();
   const names = tools.map((t) => t.name).sort();
   assert.deepEqual(names, [
+    "audit_query",
     "cliq_get_messages", "cliq_list_channel_members", "cliq_list_channels",
     "crm_get_record", "crm_list_modules", "crm_list_records", "crm_search_records",
     "db_count", "db_list_tables", "db_query",
@@ -141,4 +149,88 @@ test("projects tools fail cleanly without PROJECTS_PORTAL_ID", async () => {
   if (saved) process.env.PROJECTS_PORTAL_ID = saved;
   assert.equal(r.isError, true);
   assert.match(r.content[0].text, /PROJECTS_PORTAL_ID/);
+});
+
+// --- Audit log ---
+
+test("audit logs every call with user, params and result count but not the data", async () => {
+  const sink = memorySink();
+  const client = await connect({ sinks: [sink], user: "ana@iris.ca" });
+  await client.callTool({ name: "db_count", arguments: { table: "users" } }); // rejected by allowlist
+  const rows = sink.rows;
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].user, "ana@iris.ca");
+  assert.equal(rows[0].tool, "db_count");
+  assert.equal(rows[0].system, "db");
+  assert.equal(rows[0].kind, "read");
+  assert.equal(rows[0].outcome, "error");
+  assert.equal(rows[0].params.table, "users");
+  assert.ok(rows[0].duration_ms >= 0);
+});
+
+test("audit logs successful reads with a result count and no payload", async () => {
+  const sink = memorySink();
+  const rowsData = [
+    { request_id: "1", request_name: "Lease_A", request_status: "completed", created_time: 1760000000000, actions: [] },
+    { request_id: "2", request_name: "Lease_B", request_status: "completed", created_time: 1750000000000, actions: [] },
+  ];
+  await withMockedZoho([["/requests", { status: "success", requests: rowsData, page_context: { has_more_rows: false } }]], async () => {
+    const client = await connect({ sinks: [sink], user: "ana@iris.ca" });
+    await client.callTool({ name: "sign_list_requests", arguments: {} });
+  });
+  assert.equal(sink.rows[0].outcome, "ok");
+  assert.equal(sink.rows[0].result_count, 2);
+  assert.ok(!JSON.stringify(sink.rows[0]).includes("Lease_A"));
+});
+
+test("audit redacts secret-looking params", async () => {
+  const { redact } = await import("../src/audit.js");
+  assert.deepEqual(redact({ api_key: "x", note: "hi", nested: { Password: "p" } }), {
+    api_key: "[redacted]", note: "hi", nested: { Password: "[redacted]" },
+  });
+});
+
+test("audit_query is admin-only", async () => {
+  process.env.AUDIT_ADMINS = "boss@iris.ca";
+  try {
+    const denied = await (await connect({ sinks: [memorySink()], user: "ana@iris.ca" })).callTool({ name: "audit_query", arguments: {} });
+    assert.equal(denied.isError, true);
+    assert.match(denied.content[0].text, /administradores/);
+    const allowed = await (await connect({ sinks: [memorySink()], user: "boss@iris.ca" })).callTool({ name: "audit_query", arguments: {} });
+    assert.equal(allowed.isError, undefined);
+  } finally {
+    delete process.env.AUDIT_ADMINS;
+  }
+});
+
+test("write tools are fail-closed when the audit log cannot be written", async () => {
+  const { auditServer } = await import("../src/audit.js");
+  const { McpServer } = await import("@modelcontextprotocol/sdk/server/mcp.js");
+  const server = new McpServer({ name: "t", version: "0" });
+  auditServer(server, { user: "ana", sinks: [{ name: "broken", write: async () => { throw new Error("disk full"); } }] });
+  let ran = false;
+  server.registerTool("crm_create_note", { description: "x", inputSchema: {} }, async () => { ran = true; return { content: [{ type: "text", text: "{}" }] }; });
+  server.registerTool("crm_read", { description: "x", inputSchema: {}, annotations: { readOnlyHint: true } }, async () => ({ content: [{ type: "text", text: "{}" }] }));
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await server.connect(b);
+  const client = new Client({ name: "test", version: "0" });
+  await client.connect(a);
+  const w = await client.callTool({ name: "crm_create_note", arguments: {} });
+  assert.equal(w.isError, true);
+  assert.equal(ran, false);
+  const r = await client.callTool({ name: "crm_read", arguments: {} });
+  assert.equal(r.isError, undefined); // reads keep working
+});
+
+test("file sink appends JSON lines and can be queried", async () => {
+  const fs = await import("node:fs");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const { fileSink } = await import("../src/audit.js");
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "audit-")), "a.jsonl");
+  const sink = fileSink(file);
+  await sink.write({ ts: "2026-11-11T00:00:00Z", user: "ana", tool: "db_count", outcome: "ok" });
+  await sink.write({ ts: "2026-11-11T00:01:00Z", user: "bob", tool: "crm_get_record", outcome: "error" });
+  assert.equal((await sink.query({ user: "bob" })).length, 1);
+  assert.equal((await sink.query({})).length, 2);
 });

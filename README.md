@@ -12,6 +12,11 @@ MCP server (model) that lets Claude read IRIS data: **Zoho CRM, Cliq, WorkDrive,
 | Database | `db_list_tables`, `db_query`, `db_count` |
 | Sign | `sign_list_requests`, `sign_get_request` (status only; sending/recalling is out of scope) |
 | Projects | `projects_list_projects`, `projects_list_tasks`, `projects_get_task` |
+| Audit | `audit_query` (admins only, see below) |
+
+## Audit log
+
+Every tool call is recorded: who, when, tool, system, read/write, parameters (secret-looking keys redacted), outcome, result count and duration. **Data that was read is never stored.** Entries go to `logs/audit.jsonl` (git-ignored, override with `AUDIT_LOG_FILE`) and, if `AUDIT_DATABASE_URL` is set, to the Postgres table `mcp_audit_log` (`sql/create-audit-table.sql`; the role can insert and select, never update or delete). Future write tools are fail-closed: if the audit entry can't be stored, the action doesn't run. `audit_query` is limited to the users in `AUDIT_ADMINS`; in local mode the user is self-declared (`IRIS_USER` or the OS user), so this only becomes a real control once login is remote.
 
 Database guardrails: the server connects with a Postgres role that only has `SELECT` (see `sql/create-readonly-role.sql`), sessions are read-only with a 10 s statement timeout, and on top of that only tables in the allowlist (`DB_ALLOWED_TABLES`, default `properties, rental_managers, leases, tenants, maintenance_requests, property_tenant_waitlist`); columns matching `password|token|secret|hash|api_key` are never read or returned; max 200 rows per query.
 
@@ -66,4 +71,4 @@ This model runs locally and uses shared service credentials, so whoever has the 
 
 ## Not verified against live APIs
 
-The server and its guardrails are covered by `npm test`, but the Zoho endpoints (Sign and Projects have only been exercised with mocked responses so far) were written from the API docs and the existing backends' conventions and have **not been run against real IRIS credentials**. Test each tool once with real tokens.
+All read tools (CRM, Cliq, WorkDrive, DB, Sign, Projects) have been run against real IRIS credentials. Still unconfirmed: Projects task comments (returned empty on the one task tried) and the Postgres audit sink (only the file sink and in-memory sinks are covered by tests).
