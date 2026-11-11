@@ -8,6 +8,7 @@ export const signBase = () => process.env.SIGN_API_BASE || "https://sign.zohoclo
 export const projectsBase = () => process.env.PROJECTS_API_BASE || "https://projectsapi.zohocloud.ca";
 
 const cache = new Map(); // product -> { token, expiresAt }
+export const resetTokenCache = () => cache.clear(); // for tests
 
 const REFRESH_ENV = {
   crm: ["Z_REFRESH_TOKEN"],
@@ -18,6 +19,11 @@ const REFRESH_ENV = {
   sign: ["Z_SIGN_REFRESH_TOKEN", "Z_REFRESH_TOKEN"],
   projects: ["PROJECTS_REFRESH_TOKEN", "Z_REFRESH_TOKEN"],
 };
+
+// Write products use ONE separate token (Z_WRITE_REFRESH_TOKEN) with CREATE/UPDATE scopes
+// and never DELETE. They deliberately do not fall back to the read tokens, and the read
+// tokens cannot write. See docs/SPEC.md section 5.
+for (const p of ["crm", "cliq", "workdrive", "projects"]) REFRESH_ENV[`${p}_write`] = ["Z_WRITE_REFRESH_TOKEN"];
 
 function credentials(product) {
   const refresh = REFRESH_ENV[product].map((k) => process.env[k]).find(Boolean);
@@ -64,6 +70,34 @@ export async function zohoGet(product, url, params = {}) {
   }
   const token = await getAccessToken(product);
   const res = await fetch(u, { headers: { Authorization: `Zoho-oauthtoken ${token}` } });
+  if (res.status === 204) return null;
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Zoho ${product} ${res.status}: ${text.slice(0, 500)}`);
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+/**
+ * POST against a Zoho API with a write token. This is the only write primitive: there is
+ * no PUT/PATCH/DELETE helper on purpose. Body: json, form (urlencoded) or multipart (FormData).
+ */
+export async function zohoPost(product, url, { json, form, multipart } = {}) {
+  if (!product.endsWith("_write")) throw new Error("zohoPost solo acepta productos de escritura");
+  const token = await getAccessToken(product);
+  const headers = { Authorization: `Zoho-oauthtoken ${token}` };
+  let body;
+  if (json !== undefined) {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(json);
+  } else if (form) {
+    body = new URLSearchParams(form);
+  } else if (multipart) {
+    body = multipart;
+  }
+  const res = await fetch(url, { method: "POST", headers, body });
   if (res.status === 204) return null;
   const text = await res.text();
   if (!res.ok) throw new Error(`Zoho ${product} ${res.status}: ${text.slice(0, 500)}`);

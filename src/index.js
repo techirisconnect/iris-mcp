@@ -10,6 +10,7 @@ import { registerWorkDrive } from "./tools/workdrive.js";
 import { registerDb } from "./tools/db.js";
 import { registerSign } from "./tools/sign.js";
 import { registerProjects } from "./tools/projects.js";
+import { registerWrites } from "./tools/write.js";
 import { auditServer, registerAuditQuery } from "./audit.js";
 
 // Load .env next to the package (quiet: stdout is reserved for the MCP protocol).
@@ -29,6 +30,8 @@ export function createServer(opts = {}) {
   registerDb(server);
   registerSign(server);
   registerProjects(server);
+  // Write tools exist only when explicitly enabled (and use a separate write token).
+  if (process.env.WRITES_ENABLED === "true") registerWrites(server, audit);
   return server;
 }
 

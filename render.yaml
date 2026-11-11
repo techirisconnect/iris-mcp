@@ -41,6 +41,13 @@ services:
         sync: false
       - key: DATABASE_URL_READONLY
         sync: false
+      # Write tools: stay off until WRITES_ENABLED=true and the write token is set
+      - key: WRITES_ENABLED
+        value: "false"
+      - key: Z_WRITE_REFRESH_TOKEN
+        sync: false
+      - key: CLIQ_WRITE_CHANNELS
+        sync: false
       - key: Z_ACCOUNTS_BASE
         value: https://accounts.zohocloud.ca
       - key: Z_API_BASE

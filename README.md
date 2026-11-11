@@ -14,6 +14,20 @@ MCP server (model) that lets Claude read IRIS data: **Zoho CRM, Cliq, WorkDrive,
 | Projects | `projects_list_projects`, `projects_list_tasks`, `projects_get_task` |
 | Audit | `audit_query` (admins only, see below) |
 
+## Write tools (Level A, off by default)
+
+Set `WRITES_ENABLED=true` to register them. They only **add** things; nothing overwrites or deletes, and no tool or HTTP helper for deleting exists (the only write primitive is `POST`, and a test fails if `PUT`/`PATCH`/`DELETE` appear in `src/`).
+
+| Tool | What it does |
+|---|---|
+| `crm_add_note` | Note on a lead, contact, deal or account |
+| `crm_create_task` | CRM task, optionally linked to a record |
+| `projects_create_task`, `projects_add_comment` | New task / comment in Zoho Projects |
+| `cliq_post_message` | Message to a channel in `CLIQ_WRITE_CHANNELS` only |
+| `workdrive_upload_file` | **New** text file in an existing folder; refuses if the name exists |
+
+They use a separate token (`Z_WRITE_REFRESH_TOKEN`, CREATE scopes only; the read tokens cannot write and writes never fall back to them). Every text written ends with a footer saying it came from Claude at the request of the user. Writes are audited before they run (fail-closed) and the log keeps what was written. Level B (updates with confirmation) is not implemented yet.
+
 ## Audit log
 
 Every tool call is recorded: who, when, tool, system, read/write, parameters (secret-looking keys redacted), outcome, result count and duration. **Data that was read is never stored.** Entries go to `logs/audit.jsonl` (git-ignored, override with `AUDIT_LOG_FILE`) and, if `AUDIT_DATABASE_URL` is set, to the Postgres table `mcp_audit_log` (`sql/create-audit-table.sql`; the role can insert and select, never update or delete). Future write tools are fail-closed: if the audit entry can't be stored, the action doesn't run. `audit_query` is admin-only: in remote mode admins are the emails in `ADMIN_EMAILS` (or `is_admin` in `mcp_users`), decided by the login; in local mode it uses `AUDIT_ADMINS` and the user is self-declared (`IRIS_USER` or the OS user), so it is not a real control there.

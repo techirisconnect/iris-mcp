@@ -4,7 +4,7 @@ import { safe, ID_RE, clip } from "../util.js";
 
 // Read-only view of Zoho Projects (REST v1 portal API, the same one the backends use).
 
-function portalUrl() {
+export function portalUrl() {
   const portal = process.env.PROJECTS_PORTAL_ID;
   if (!portal) throw new Error("Zoho Projects no configurado: falta PROJECTS_PORTAL_ID");
   return `${projectsBase()}/restapi/portal/${encodeURIComponent(portal)}`;

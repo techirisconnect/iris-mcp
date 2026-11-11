@@ -15,14 +15,15 @@ import { ok, fail, safe, clip } from "./util.js";
 
 const SECRET_KEY_RE = /pass(word)?|token|secret|hash|api_?key|authorization/i;
 
-export function redact(value, depth = 0) {
+// Reads keep short params; writes keep up to 2000 chars per field so the log shows what was written.
+export function redact(value, depth = 0, max = 200) {
   if (value === null || value === undefined) return value;
-  if (typeof value === "string") return clip(value, 200);
+  if (typeof value === "string") return clip(value, max);
   if (typeof value !== "object") return value;
   if (depth > 3) return "[…]";
-  if (Array.isArray(value)) return value.slice(0, 20).map((v) => redact(v, depth + 1));
+  if (Array.isArray(value)) return value.slice(0, 20).map((v) => redact(v, depth + 1, max));
   return Object.fromEntries(
-    Object.entries(value).map(([k, v]) => [k, SECRET_KEY_RE.test(k) ? "[redacted]" : redact(v, depth + 1)]),
+    Object.entries(value).map(([k, v]) => [k, SECRET_KEY_RE.test(k) ? "[redacted]" : redact(v, depth + 1, max)]),
   );
 }
 
@@ -128,7 +129,7 @@ export function auditServer(server, opts = {}) {
     const wrapped = async (args, extra) => {
       const base = {
         user: getUser(), tool: name, system: systemOf(name),
-        kind: readOnly ? "read" : "write", params: redact(args ?? {}),
+        kind: readOnly ? "read" : "write", params: redact(args ?? {}, 0, readOnly ? 200 : 2000),
       };
       const started = Date.now();
       if (!readOnly) {
