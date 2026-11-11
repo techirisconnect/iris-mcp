@@ -20,6 +20,12 @@ Every tool call is recorded: who, when, tool, system, read/write, parameters (se
 
 Database guardrails: the server connects with a Postgres role that only has `SELECT` (see `sql/create-readonly-role.sql`), sessions are read-only with a 10 s statement timeout, and on top of that only tables in the allowlist (`DB_ALLOWED_TABLES`, default `properties, rental_managers, leases, tenants, maintenance_requests, property_tenant_waitlist`); columns matching `password|token|secret|hash|api_key` are never read or returned; max 200 rows per query.
 
+## Remote mode (per-person login)
+
+`node src/http.js` serves the same tools over streamable HTTP at `POST /mcp`. The server is its own OAuth authorization server (it supports dynamic client registration, which Zoho does not) and delegates the login to Zoho: Claude → `/authorize` → Zoho login → `/zoho/callback` → our code → `/token`. Only emails present in `mcp_users` (or listed in `ADMIN_EMAILS`) get a token; access tokens last 1 h, refresh tokens 30 days and rotate on use. Tokens are stored hashed, and the user is re-checked on every request, so revoking someone (`update mcp_users set revoked_at = now() ...`) cuts them off on their next call. Every call is audited under their email.
+
+Setup: run `sql/create-auth-tables.sql`, create the Zoho login client, set the variables from `.env.example` (remote section) and deploy with `render.yaml`. Step-by-step in [docs/DEPLOY.md](docs/DEPLOY.md).
+
 ## Install
 
 For the team (non-developers) see [INSTALL.md](INSTALL.md).

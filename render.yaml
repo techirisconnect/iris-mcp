@@ -1,0 +1,49 @@
+# Render blueprint for the remote iris-mcp. Secrets are entered in the Render dashboard
+# (sync: false), never committed.
+services:
+  - type: web
+    name: iris-mcp
+    runtime: node
+    region: oregon
+    plan: starter            # the free plan sleeps and would make the first call time out
+    buildCommand: npm ci
+    startCommand: node src/http.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # Public URL of this service, e.g. https://iris-mcp.onrender.com (no trailing slash)
+      - key: BASE_URL
+        sync: false
+      # Login with Zoho (a "Server-based Application" client; redirect URI = BASE_URL/zoho/callback)
+      - key: ZOHO_LOGIN_CLIENT_ID
+        sync: false
+      - key: ZOHO_LOGIN_CLIENT_SECRET
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false
+      - key: AUTH_DATABASE_URL
+        sync: false
+      - key: AUDIT_DATABASE_URL
+        sync: false
+      # Service credentials toward the APIs (read-only today)
+      - key: Z_CLIENT_ID
+        sync: false
+      - key: Z_CLIENT_SECRET
+        sync: false
+      - key: Z_REFRESH_TOKEN
+        sync: false
+      - key: CLIQ_OAUTH_REFRESH_TOKEN
+        sync: false
+      - key: Z_WORKDRIVE_REFRESH_TOKEN
+        sync: false
+      - key: PROJECTS_PORTAL_ID
+        sync: false
+      - key: DATABASE_URL_READONLY
+        sync: false
+      - key: Z_ACCOUNTS_BASE
+        value: https://accounts.zohocloud.ca
+      - key: Z_API_BASE
+        value: https://www.zohoapis.ca
+      - key: CLIQ_BASE_URL
+        value: https://cliq.zohocloud.ca
