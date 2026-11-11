@@ -43,7 +43,8 @@ export function createApp({ provider, baseUrl, sinks }) {
 
   // Stateless: a fresh server per request, bound to the authenticated user.
   app.post("/mcp", express.json({ limit: "1mb" }), bearer, async (req, res) => {
-    const server = createServer({ user: req.auth.extra.email, ...(sinks && { sinks }) });
+    const { email, isAdmin } = req.auth.extra;
+    const server = createServer({ user: email, isAdmin: () => isAdmin === true, ...(sinks && { sinks }) });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     res.on("close", () => { transport.close(); server.close(); });
     try {
@@ -69,7 +70,6 @@ function requireEnv(...names) {
 
 export function providerFromEnv() {
   requireEnv("BASE_URL", "ZOHO_LOGIN_CLIENT_ID", "ZOHO_LOGIN_CLIENT_SECRET", "AUTH_DATABASE_URL", "ADMIN_EMAILS");
-  process.env.AUDIT_ADMINS ||= process.env.ADMIN_EMAILS;
   return new IrisOAuthProvider({
     store: pgStore(),
     baseUrl: process.env.BASE_URL,

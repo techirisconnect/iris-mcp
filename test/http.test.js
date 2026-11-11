@@ -88,6 +88,25 @@ test("full flow: registration, Zoho login, token, MCP call attributed to the use
   } finally { t.close(); }
 });
 
+test("audit_query follows the login: admins from ADMIN_EMAILS yes, other users no, AUDIT_ADMINS ignored", async () => {
+  process.env.AUDIT_ADMINS = "bob@iris.ca"; // a stale value copied from a local .env must not matter
+  const t = await setup();
+  try {
+    const run = async (email) => {
+      const { body } = await t.tokens(email);
+      const client = new Client({ name: "t", version: "0" });
+      await client.connect(new StreamableHTTPClientTransport(new URL(`${t.base}/mcp`), {
+        requestInit: { headers: { Authorization: `Bearer ${body.access_token}` } },
+      }));
+      const r = await client.callTool({ name: "audit_query", arguments: {} });
+      await client.close();
+      return r;
+    };
+    assert.equal((await run("ana@iris.ca")).isError, undefined);
+    assert.equal((await run("bob@iris.ca")).isError, true);
+  } finally { delete process.env.AUDIT_ADMINS; t.close(); }
+});
+
 test("/mcp without a token is 401 with the resource metadata pointer", async () => {
   const t = await setup();
   try {

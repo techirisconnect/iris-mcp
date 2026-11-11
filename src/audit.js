@@ -156,12 +156,12 @@ export function auditServer(server, opts = {}) {
     return original(name, config, wrapped);
   };
 
-  return { sinks, getUser };
+  return { sinks, getUser, isAdmin: opts.isAdmin };
 }
 
 // --- admin-only query tool ---
 
-export function registerAuditQuery(server, { sinks, getUser }) {
+export function registerAuditQuery(server, { sinks, getUser, isAdmin }) {
   const admins = () => (process.env.AUDIT_ADMINS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
   server.registerTool(
     "audit_query",
@@ -177,8 +177,10 @@ export function registerAuditQuery(server, { sinks, getUser }) {
       annotations: { readOnlyHint: true },
     },
     safe(async (args) => {
-      if (!admins().includes(String(getUser()).toLowerCase())) {
-        throw new Error("audit_query es solo para administradores (AUDIT_ADMINS)");
+      // Remote mode: the login decides (mcp_users.is_admin or ADMIN_EMAILS). Local mode: AUDIT_ADMINS.
+      const allowed = typeof isAdmin === "function" ? isAdmin() : admins().includes(String(getUser()).toLowerCase());
+      if (!allowed) {
+        throw new Error("audit_query es solo para administradores");
       }
       const sink = sinks.find((s) => s.name === "postgres") ?? sinks[0];
       if (!sink) throw new Error("No hay destino de auditoría configurado");
