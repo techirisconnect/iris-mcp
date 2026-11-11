@@ -6,17 +6,23 @@ Con esto, Claude Desktop puede **consultar** (solo leer, nunca modificar) el CRM
 
 - **Claude Desktop** instalado y con tu cuenta.
 - **Node.js 20 o superior**. Para comprobarlo, abrí una terminal y escribí `node -v`. Si no lo tenés, descargalo de nodejs.org (versión LTS).
-- **La carpeta `iris-mcp`** que te pasó el equipo de tecnología. Guardala en un lugar fijo, por ejemplo `C:\IRIS\iris-mcp`. No la muevas después.
+- **Git** instalado (`git --version` en una terminal; si no, descargalo de git-scm.com) y una **cuenta de GitHub con acceso al repo** `techirisconnect/iris-mcp`. Si no podés abrirlo, pedile a tecnología que te dé acceso de lectura.
 - **El archivo `.env`** con las credenciales (ver paso 2).
 
-## 1. Instalar dependencias
+## 1. Descargar el código e instalar dependencias
 
-En una terminal, dentro de la carpeta:
+En una terminal, en la carpeta donde quieras guardarlo (por ejemplo `C:\IRIS`). No la muevas después, porque la config de Claude apunta a esa ruta:
 
 ```bash
-cd C:\IRIS\iris-mcp
+cd C:\IRIS
+git clone https://github.com/techirisconnect/iris-mcp.git
+cd iris-mcp
 npm install
 ```
+
+La primera vez, Git abre el navegador para que inicies sesión en GitHub. Para actualizar más adelante: `git pull` dentro de la carpeta y luego `npm install`.
+
+Si no podés usar Git, tecnología puede pasarte la carpeta en un zip. En ese caso descomprimila y corré solo `npm install`.
 
 ## 2. Recibir el `.env` de forma segura
 
