@@ -4,6 +4,8 @@
 const accountsBase = () => process.env.Z_ACCOUNTS_BASE || "https://accounts.zohocloud.ca";
 export const apiBase = () => process.env.Z_API_BASE || "https://www.zohoapis.ca";
 export const cliqBase = () => process.env.CLIQ_BASE_URL || "https://cliq.zohocloud.ca";
+export const signBase = () => process.env.SIGN_API_BASE || "https://sign.zohocloud.ca/api/v1";
+export const projectsBase = () => process.env.PROJECTS_API_BASE || "https://projectsapi.zohocloud.ca";
 
 const cache = new Map(); // product -> { token, expiresAt }
 
@@ -11,6 +13,10 @@ const REFRESH_ENV = {
   crm: ["Z_REFRESH_TOKEN"],
   cliq: ["CLIQ_OAUTH_REFRESH_TOKEN"],
   workdrive: ["Z_WORKDRIVE_REFRESH_TOKEN"],
+  // Sign and Projects fall back to the combined read-only token (Z_REFRESH_TOKEN)
+  // when it was generated with their scopes too.
+  sign: ["Z_SIGN_REFRESH_TOKEN", "Z_REFRESH_TOKEN"],
+  projects: ["PROJECTS_REFRESH_TOKEN", "Z_REFRESH_TOKEN"],
 };
 
 function credentials(product) {

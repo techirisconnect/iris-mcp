@@ -1,6 +1,6 @@
 # iris-mcp
 
-MCP server (model) that lets Claude read IRIS data: **Zoho CRM, Zoho Cliq, Zoho WorkDrive** and the **IRIS database (Supabase)**. Read-only by design: every tool is annotated `readOnlyHint` and none writes.
+MCP server (model) that lets Claude read IRIS data: **Zoho CRM, Cliq, WorkDrive, Sign, Projects** and the **IRIS database (Supabase)**. Read-only by design (v0.2): every tool is annotated `readOnlyHint` and none writes. The full target (remote, per-user login, writes without delete, audit logs) is in [docs/SPEC.md](docs/SPEC.md).
 
 ## Tools
 
@@ -10,6 +10,8 @@ MCP server (model) that lets Claude read IRIS data: **Zoho CRM, Zoho Cliq, Zoho 
 | Cliq | `cliq_list_channels`, `cliq_list_channel_members`, `cliq_get_messages` |
 | WorkDrive | `workdrive_search`, `workdrive_list_folder`, `workdrive_get_file_info`, `workdrive_read_file` (text files only) |
 | Database | `db_list_tables`, `db_query`, `db_count` |
+| Sign | `sign_list_requests`, `sign_get_request` (status only; sending/recalling is out of scope) |
+| Projects | `projects_list_projects`, `projects_list_tasks`, `projects_get_task` |
 
 Database guardrails: the server connects with a Postgres role that only has `SELECT` (see `sql/create-readonly-role.sql`), sessions are read-only with a 10 s statement timeout, and on top of that only tables in the allowlist (`DB_ALLOWED_TABLES`, default `properties, rental_managers, leases, tenants, maintenance_requests, property_tenant_waitlist`); columns matching `password|token|secret|hash|api_key` are never read or returned; max 200 rows per query.
 
@@ -51,7 +53,7 @@ Credentials are read from `iris-mcp/.env` (or from the `env` block of the config
 
 ## Credentials
 
-- **Zoho**: one Self Client in the Canada DC; generate a refresh token **per product** (scopes differ). Read-only scopes are enough: `ZohoCRM.modules.READ`, `ZohoCRM.settings.READ`, `ZohoCliq.Channels.READ`, `ZohoCliq.Messages.READ`, `WorkDrive.files.READ`, `WorkDrive.team.READ`.
+- **Zoho**: one Self Client in the Canada DC; generate a refresh token **per product** (scopes differ). Read-only scopes are enough: `ZohoCRM.modules.READ`, `ZohoCRM.settings.READ`, `ZohoCliq.Channels.READ`, `ZohoCliq.Messages.READ`, `WorkDrive.files.READ`, `WorkDrive.team.READ`, and for Sign and Projects `ZohoSign.documents.READ`, `ZohoProjects.portals.READ`, `ZohoProjects.projects.READ`, `ZohoProjects.tasks.READ`, `ZohoProjects.tasklists.READ`. Sign and Projects reuse `Z_REFRESH_TOKEN` unless `Z_SIGN_REFRESH_TOKEN` / `PROJECTS_REFRESH_TOKEN` are set; Projects also needs `PROJECTS_PORTAL_ID`.
 - **Database**: run `sql/create-readonly-role.sql` in the Supabase SQL Editor (set a password first), then put the role's connection string in `DATABASE_URL_READONLY`. Don't use the service key the backends use.
 
 ## Security notes (read before rolling out to the team)
@@ -64,4 +66,4 @@ This model runs locally and uses shared service credentials, so whoever has the 
 
 ## Not verified against live APIs
 
-The server and its guardrails are covered by `npm test`, but the Zoho endpoints (especially Cliq `chats/{id}/messages`, WorkDrive search) were written from the API docs and the existing backends' conventions and have **not been run against real IRIS credentials**. Test each tool once with real tokens.
+The server and its guardrails are covered by `npm test`, but the Zoho endpoints (Sign and Projects have only been exercised with mocked responses so far) were written from the API docs and the existing backends' conventions and have **not been run against real IRIS credentials**. Test each tool once with real tokens.

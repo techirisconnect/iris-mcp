@@ -8,6 +8,8 @@ import { registerCrm } from "./tools/crm.js";
 import { registerCliq } from "./tools/cliq.js";
 import { registerWorkDrive } from "./tools/workdrive.js";
 import { registerDb } from "./tools/db.js";
+import { registerSign } from "./tools/sign.js";
+import { registerProjects } from "./tools/projects.js";
 
 // Load .env next to the package (quiet: stdout is reserved for the MCP protocol).
 dotenv.config({
@@ -21,6 +23,8 @@ export function createServer() {
   registerCliq(server);
   registerWorkDrive(server);
   registerDb(server);
+  registerSign(server);
+  registerProjects(server);
   return server;
 }
 
