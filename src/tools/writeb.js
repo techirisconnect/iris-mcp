@@ -61,7 +61,7 @@ const taskOf = (r) => r?.tasks?.[0];
 const taskState = (t) => ({
   status_id: String(t?.status?.id ?? t?.custom_status ?? ""),
   status: t?.status?.name ?? null,
-  owners: (t?.details?.owners || []).map((o) => ({ id: String(o.id), name: o.name })),
+  owners: (t?.details?.owners || []).map((o) => ({ id: o.id ? String(o.id) : null, name: o.name })), // "Unassigned" has no id
 });
 async function readTask(project_id, task_id) {
   const t = taskOf(await zohoGet("projects", `${portalUrl()}/projects/${project_id}/tasks/${task_id}/`));
@@ -165,7 +165,7 @@ export function registerWritesB(server, { getUser, record }) {
   server.registerTool(
     "projects_propose_task_change",
     {
-      description: "Step 1 of 2. Show the change of status and/or responsible person of a Zoho Projects task (current → new) without applying it.",
+      description: "Step 1 of 2. Show the change of status and/or responsible person of a Zoho Projects task (current → new) without applying it. Standard status ids: Open 18306000000000356, In Progress 18306000000000362, Closed 18306000000000359. Owner ids can be read from the owners of existing tasks (projects_get_task).",
       inputSchema: taskChange,
       annotations: READ,
     },
