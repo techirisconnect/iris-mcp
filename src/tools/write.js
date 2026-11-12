@@ -47,8 +47,9 @@ export function registerWrites(server, { getUser }) {
       annotations: WRITE,
     },
     safe(async ({ module, id, title, content }) =>
-      crmResult(await zohoPost("crm_write", `${crm()}/${module}/${id}/Notes`, {
-        json: { data: [{ Note_Title: title, Note_Content: signed(content, getUser()) }] },
+      // Generic /Notes endpoint: the nested /{module}/{id}/Notes route is rejected with OAUTH_SCOPE_MISMATCH
+      crmResult(await zohoPost("crm_write", `${crm()}/Notes`, {
+        json: { data: [{ Note_Title: title, Note_Content: signed(content, getUser()), Parent_Id: id, se_module: module }] },
       })),
     ),
   );

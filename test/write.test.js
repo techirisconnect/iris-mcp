@@ -79,14 +79,15 @@ test("source has no HTTP method other than GET/POST", () => {
 });
 
 test("crm_add_note POSTs with the WRITE token, signs the text and is audited as a write", async () => {
-  await withEnv({}, [["/Leads/123/Notes", { data: [{ code: "SUCCESS", details: { id: "n1" } }] }]], async (requests) => {
+  await withEnv({}, [["/crm/v2/Notes",{ data: [{ code: "SUCCESS", details: { id: "n1" } }] }]], async (requests) => {
     const { client, rows } = await connect();
     const r = await client.callTool({ name: "crm_add_note", arguments: { module: "Leads", id: "123", content: "Llamó, quiere ver el unit" } });
     assert.equal(r.isError, undefined);
     assert.equal(JSON.parse(r.content[0].text).id, "n1");
     const [p] = posts(requests);
     assert.equal(p.method, "POST");
-    assert.match(p.url, /\/crm\/v2\/Leads\/123\/Notes$/);
+    assert.match(p.url, /\/crm\/v2\/Notes$/);
+    assert.deepEqual([JSON.parse(p.body).data[0].Parent_Id, JSON.parse(p.body).data[0].se_module], ["123", "Leads"]);
     assert.match(p.body, /a pedido de ana@iris\.ca/);
     assert.match(p.headers.Authorization, /at-WRITE-token/); // never the read token
     const tokenCalls = requests.filter((q) => q.url.includes("/oauth/"));

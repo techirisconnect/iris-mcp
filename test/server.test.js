@@ -4,6 +4,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createServer } from "../src/index.js";
 
+delete process.env.WRITES_ENABLED; // a developer's local .env may enable writes; these tests assume read-only
+
 // Keep test runs out of the real audit log.
 const memorySink = (rows = []) => ({
   name: "memory", rows,
