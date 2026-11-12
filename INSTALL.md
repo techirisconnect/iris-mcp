@@ -1,6 +1,6 @@
 # Conectar IRIS a Claude (guía para el equipo)
 
-Con esto, Claude puede **consultar** (por ahora solo leer, nunca modificar) el CRM, Cliq, WorkDrive, Sign, Projects y la base de datos de IRIS. Tarda unos 2 minutos y no instalás nada.
+Con esto, Claude puede **consultar** el CRM, Cliq, WorkDrive, Sign, Projects y la base de datos de IRIS, y **agregar** notas, tareas, comentarios, mensajes y archivos de texto. Nunca puede borrar ni modificar lo que ya existe. Tarda unos 2 minutos y no instalás nada.
 
 ## Antes de empezar
 
@@ -24,13 +24,20 @@ En un chat nuevo, con el conector IRIS activado, probá:
 - "Mostrame los contratos de Sign que están pendientes de firma."
 - "Mostrame las tareas abiertas de Tenant Operations en Projects."
 
-La primera vez Claude pide permiso para usar cada herramienta. Podés aceptar "siempre permitir".
+La primera vez Claude pide permiso para usar cada herramienta. En las de lectura podés aceptar "siempre permitir"; en las de escritura, mejor aprobar caso por caso.
 
 ## Qué puede y qué no puede hacer
 
 - **Puede:** leer registros del CRM, canales y mensajes de Cliq, archivos de WorkDrive (los de texto se leen; PDFs y otros devuelven el enlace), el estado de los documentos de Sign, proyectos y tareas de Projects, y las tablas permitidas de la base.
-- **No puede:** crear, editar ni borrar nada. Tampoco ve contraseñas, tokens ni códigos de acceso de propiedades.
-- **Queda registro:** cada consulta se guarda con tu nombre, la hora y qué herramienta usaste. Se guarda qué pediste, no los datos que Claude leyó.
+- **Puede agregar** (siempre algo nuevo):
+  - una nota o una tarea en el CRM (en un lead, contacto, deal o cuenta);
+  - una tarea o un comentario en Projects;
+  - un mensaje en el canal de Cliq habilitado para pruebas;
+  - un archivo de texto nuevo (`.txt .md .csv .json .html .log`) en una carpeta de WorkDrive. Si ya existe uno con ese nombre, no lo pisa.
+- **No puede:** borrar nada, ni editar o reemplazar lo que ya existe, ni enviar documentos a firmar en Sign. Tampoco ve contraseñas, tokens ni códigos de acceso de propiedades. El borrado está bloqueado por los permisos de Zoho, no solo por el código.
+- **Firma:** todo texto que Claude escribe termina con "enviado desde Claude (IRIS MCP) a pedido de <tu correo>", para que se sepa de dónde salió.
+- **Cuidado:** lo que Claude agrega queda en el sistema real y solo se corrige a mano. Revisá lo que va a escribir antes de aceptar cada herramienta de escritura (no uses "siempre permitir" con ellas).
+- **Queda registro:** cada acción se guarda con tu nombre, la hora y qué herramienta usaste. De las lecturas se guarda qué pediste, no los datos leídos. De las escrituras se guarda también lo que se escribió.
 - Lo que Claude lea de IRIS pasa por tu conversación con Claude. Tratá esos datos (inquilinos, leases, contactos) con el mismo cuidado que en cualquier otra herramienta de la empresa.
 
 ## Si algo falla
@@ -60,6 +67,8 @@ update public.mcp_users set revoked_at = now() where email = 'persona@irisproper
 ```
 
 **Ver qué hizo alguien:** un administrador le pide a Claude *"consultá el log de auditoría con audit_query"* (filtra por usuario, herramienta, resultado y fecha). Los administradores son los de `ADMIN_EMAILS`.
+
+**Escritura:** se activa con `WRITES_ENABLED=true` y el token `Z_WRITE_REFRESH_TOKEN` (solo permisos de crear). Cliq solo publica en los canales de `CLIQ_WRITE_CHANNELS`. Para apagarla, poné `WRITES_ENABLED=false` y redeployá.
 
 Detalles de despliegue en `docs/DEPLOY.md`.
 
