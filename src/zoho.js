@@ -25,6 +25,10 @@ const REFRESH_ENV = {
 // tokens cannot write. See docs/SPEC.md section 5.
 for (const p of ["crm", "cliq", "workdrive", "projects"]) REFRESH_ENV[`${p}_write`] = ["Z_WRITE_REFRESH_TOKEN"];
 
+// Level B (updates/creates with confirmation) uses a second token, Z_WRITE_B_REFRESH_TOKEN,
+// with UPDATE/CREATE scopes and never DELETE. Products end in "_b".
+for (const p of ["crm", "projects"]) REFRESH_ENV[`${p}_b`] = ["Z_WRITE_B_REFRESH_TOKEN"];
+
 function credentials(product) {
   const refresh = REFRESH_ENV[product].map((k) => process.env[k]).find(Boolean);
   const id = (product === "cliq" && process.env.CLIQ_OAUTH_CLIENT_ID) || process.env.Z_CLIENT_ID;
@@ -84,8 +88,18 @@ export async function zohoGet(product, url, params = {}) {
  * POST against a Zoho API with a write token. This is the only write primitive: there is
  * no PUT/PATCH/DELETE helper on purpose. Body: json, form (urlencoded) or multipart (FormData).
  */
-export async function zohoPost(product, url, { json, form, multipart } = {}) {
-  if (!product.endsWith("_write")) throw new Error("zohoPost solo acepta productos de escritura");
+export async function zohoPost(product, url, opts = {}) {
+  if (!/_(write|b)$/.test(product)) throw new Error("zohoPost solo acepta productos de escritura");
+  return send("POST", product, url, opts);
+}
+
+/** PUT (update in place) against a Zoho API. Only for Level B products ("_b"). */
+export async function zohoPut(product, url, opts = {}) {
+  if (!product.endsWith("_b")) throw new Error("zohoPut solo acepta productos de nivel B");
+  return send("PUT", product, url, opts);
+}
+
+async function send(method, product, url, { json, form, multipart } = {}) {
   const token = await getAccessToken(product);
   const headers = { Authorization: `Zoho-oauthtoken ${token}` };
   let body;
@@ -97,7 +111,7 @@ export async function zohoPost(product, url, { json, form, multipart } = {}) {
   } else if (multipart) {
     body = multipart;
   }
-  const res = await fetch(url, { method: "POST", headers, body });
+  const res = await fetch(url, { method, headers, body });
   if (res.status === 204) return null;
   const text = await res.text();
   if (!res.ok) throw new Error(`Zoho ${product} ${res.status}: ${text.slice(0, 500)}`);

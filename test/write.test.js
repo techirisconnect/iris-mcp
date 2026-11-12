@@ -16,6 +16,7 @@ const WRITE_TOOLS = [
 async function withEnv(extraEnv, routes, fn) {
   const saved = { fetch: globalThis.fetch, env: { ...process.env } };
   resetTokenCache();
+  delete process.env.WRITES_B_ENABLED; // a local .env may enable Level B; these tests cover Level A only
   Object.assign(process.env, {
     Z_CLIENT_ID: "id", Z_CLIENT_SECRET: "secret", Z_REFRESH_TOKEN: "READ-token", Z_WRITE_REFRESH_TOKEN: "WRITE-token",
     PROJECTS_PORTAL_ID: "p1", WRITES_ENABLED: "true", CLIQ_WRITE_CHANNELS: "tech-team", ...extraEnv,
@@ -69,13 +70,16 @@ test("write tools are exactly the Level A list, none can delete", async () => {
   });
 });
 
-test("source has no HTTP method other than GET/POST", () => {
+test("source never uses DELETE/PATCH, and PUT only in zoho.js for Level B", () => {
   const dir = path.resolve("src");
   const files = fs.readdirSync(dir, { recursive: true }).filter((f) => f.endsWith(".js"));
   for (const f of files) {
     const text = fs.readFileSync(path.join(dir, f), "utf8");
-    assert.doesNotMatch(text, /method:\s*["'](DELETE|PUT|PATCH)["']/i, `${f} uses a forbidden HTTP method`);
+    assert.doesNotMatch(text, /["'`](DELETE|PATCH)["'`]/, `${f} uses a forbidden HTTP method`);
+    if (f !== "zoho.js") assert.doesNotMatch(text, /["'`]PUT["'`]/, `${f} uses PUT outside zoho.js`);
   }
+  const zoho = fs.readFileSync(path.join(dir, "zoho.js"), "utf8");
+  assert.match(zoho, /zohoPut[\s\S]*endsWith\("_b"\)/); // PUT is restricted to Level B products
 });
 
 test("crm_add_note POSTs with the WRITE token, signs the text and is audited as a write", async () => {

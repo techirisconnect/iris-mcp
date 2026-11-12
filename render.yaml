@@ -48,6 +48,13 @@ services:
         sync: false
       - key: CLIQ_WRITE_CHANNELS
         sync: false
+      # Level B writes (updates with confirmation): off until WRITES_B_ENABLED=true and its token is set
+      - key: WRITES_B_ENABLED
+        value: "false"
+      - key: Z_WRITE_B_REFRESH_TOKEN
+        sync: false
+      - key: CONFIRM_SECRET
+        sync: false
       - key: Z_ACCOUNTS_BASE
         value: https://accounts.zohocloud.ca
       - key: Z_API_BASE

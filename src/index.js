@@ -11,6 +11,7 @@ import { registerDb } from "./tools/db.js";
 import { registerSign } from "./tools/sign.js";
 import { registerProjects } from "./tools/projects.js";
 import { registerWrites } from "./tools/write.js";
+import { registerWritesB } from "./tools/writeb.js";
 import { auditServer, registerAuditQuery } from "./audit.js";
 
 // Load .env next to the package (quiet: stdout is reserved for the MCP protocol).
@@ -32,6 +33,8 @@ export function createServer(opts = {}) {
   registerProjects(server);
   // Write tools exist only when explicitly enabled (and use a separate write token).
   if (process.env.WRITES_ENABLED === "true") registerWrites(server, audit);
+  // Level B (updates/creates, two-step confirmation) has its own switch and its own token.
+  if (process.env.WRITES_B_ENABLED === "true") registerWritesB(server, audit);
   return server;
 }
 

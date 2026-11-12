@@ -157,7 +157,12 @@ export function auditServer(server, opts = {}) {
     return original(name, config, wrapped);
   };
 
-  return { sinks, getUser, isAdmin: opts.isAdmin };
+  // `record` lets a tool store an extra entry (e.g. old and new values) before it acts; it
+  // throws if any sink fails, so the caller can abort (fail-closed).
+  const recordStrict = (partial) =>
+    record({ user: getUser(), kind: "write", ts: new Date().toISOString(), ...partial, params: redact(partial.params ?? {}, 0, 2000) }, { strict: true });
+
+  return { sinks, getUser, isAdmin: opts.isAdmin, record: recordStrict };
 }
 
 // --- admin-only query tool ---

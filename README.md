@@ -26,7 +26,18 @@ Set `WRITES_ENABLED=true` to register them. They only **add** things; nothing ov
 | `cliq_post_message` | Message to a channel in `CLIQ_WRITE_CHANNELS` only |
 | `workdrive_upload_file` | **New** text file in an existing folder; refuses if the name exists |
 
-They use a separate token (`Z_WRITE_REFRESH_TOKEN`, CREATE scopes only; the read tokens cannot write and writes never fall back to them). Every text written ends with a footer saying it came from Claude at the request of the user. Writes are audited before they run (fail-closed) and the log keeps what was written. Level B (updates with confirmation) is not implemented yet.
+They use a separate token (`Z_WRITE_REFRESH_TOKEN`, CREATE scopes only; the read tokens cannot write and writes never fall back to them). Every text written ends with a footer saying it came from Claude at the request of the user. Writes are audited before they run (fail-closed) and the log keeps what was written. 
+## Level B writes (updates, off by default)
+
+`WRITES_B_ENABLED=true` adds three **pairs** of tools. The `propose` tool (read-only) shows current → new values and returns a signed 10-minute token bound to the user, the exact arguments and the values it saw; the `apply` tool refuses to run without it, re-reads the record (fails if it changed), writes the old and new values to the audit log **before** acting (fail-closed) and only then writes.
+
+| Pair | What it does |
+|---|---|
+| `crm_propose_update` / `crm_apply_update` | Change allowlisted fields of a lead or contact (defaults in `src/tools/writeb.js`, override with `CRM_UPDATE_FIELDS_LEADS` / `_CONTACTS`) |
+| `crm_propose_create` / `crm_apply_create` | Create a lead or contact; blocked if the email or phone already exists |
+| `projects_propose_task_change` / `projects_apply_task_change` | Change a task's status and/or responsible person |
+
+They use a second token (`Z_WRITE_B_REFRESH_TOKEN`: leads/contacts UPDATE and CREATE, `ZohoProjects.tasks.UPDATE`, never DELETE). `PUT` exists only in `zohoPut`, which accepts Level B products only; a test enforces it.
 
 ## Audit log
 
