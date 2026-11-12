@@ -34,7 +34,12 @@ La primera vez Claude pide permiso para usar cada herramienta. En las de lectura
   - una tarea o un comentario en Projects;
   - un mensaje en el canal de Cliq habilitado para pruebas;
   - un archivo de texto nuevo (`.txt .md .csv .json .html .log`) en una carpeta de WorkDrive. Si ya existe uno con ese nombre, no lo pisa.
-- **No puede:** borrar nada, ni editar o reemplazar lo que ya existe, ni enviar documentos a firmar en Sign. Tampoco ve contraseñas, tokens ni códigos de acceso de propiedades. El borrado está bloqueado por los permisos de Zoho, no solo por el código.
+- **Puede modificar, pero solo con tu OK** (Claude te muestra "valor actual → valor nuevo" y recién aplica el cambio si lo aprobás):
+  - algunos campos de notas de un lead o contacto del CRM (no email, teléfono ni nombre);
+  - crear un lead o contacto nuevo, solo si no existe ya uno con ese email o teléfono;
+  - el estado y el responsable de una tarea de Projects.
+  Si el registro cambió mientras tanto, el cambio se cancela. Se guarda el valor anterior en el registro de auditoría.
+- **No puede:** borrar nada, ni reemplazar archivos o textos ya publicados, ni enviar documentos a firmar en Sign. Tampoco ve contraseñas, tokens ni códigos de acceso de propiedades. El borrado está bloqueado por los permisos de Zoho, no solo por el código.
 - **Firma:** todo texto que Claude escribe termina con "enviado desde Claude (IRIS MCP) a pedido de <tu correo>", para que se sepa de dónde salió.
 - **Cuidado:** lo que Claude agrega queda en el sistema real y solo se corrige a mano. Revisá lo que va a escribir antes de aceptar cada herramienta de escritura (no uses "siempre permitir" con ellas).
 - **Queda registro:** cada acción se guarda con tu nombre, la hora y qué herramienta usaste. De las lecturas se guarda qué pediste, no los datos leídos. De las escrituras se guarda también lo que se escribió.
@@ -68,7 +73,7 @@ update public.mcp_users set revoked_at = now() where email = 'persona@irisproper
 
 **Ver qué hizo alguien:** un administrador le pide a Claude *"consultá el log de auditoría con audit_query"* (filtra por usuario, herramienta, resultado y fecha). Los administradores son los de `ADMIN_EMAILS`.
 
-**Escritura:** se activa con `WRITES_ENABLED=true` y el token `Z_WRITE_REFRESH_TOKEN` (solo permisos de crear). Cliq solo publica en los canales de `CLIQ_WRITE_CHANNELS`. Para apagarla, poné `WRITES_ENABLED=false` y redeployá.
+**Escritura:** se activa con `WRITES_ENABLED=true` y el token `Z_WRITE_REFRESH_TOKEN` (solo permisos de crear). Cliq solo publica en los canales de `CLIQ_WRITE_CHANNELS`. Para apagarla, poné `WRITES_ENABLED=false` y redeployá. Las modificaciones con confirmación (Nivel B) tienen su propio interruptor `WRITES_B_ENABLED`, su token `Z_WRITE_B_REFRESH_TOKEN` y `CONFIRM_SECRET` (firma las confirmaciones).
 
 Detalles de despliegue en `docs/DEPLOY.md`.
 
