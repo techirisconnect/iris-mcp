@@ -1,6 +1,6 @@
 # iris-mcp
 
-MCP server (model) that lets Claude read IRIS data: **Zoho CRM, Cliq, WorkDrive, Sign, Projects** and the **IRIS database (Supabase)**. Read-only by design (v0.2): every tool is annotated `readOnlyHint` and none writes. The full target (remote, per-user login, writes without delete, audit logs) is in [docs/SPEC.md](docs/SPEC.md).
+MCP server (model) that lets Claude read IRIS data (**Zoho CRM, Cliq, WorkDrive, Sign, Projects** and the **IRIS database (Supabase)**) and, when enabled, add or change a small set of records. It can never delete: read tools are annotated `readOnlyHint`, write tools only create (Level A) or update with confirmation (Level B), and the write tokens have no DELETE scope. The full target (remote, per-user login, writes without delete, audit logs) is in [docs/SPEC.md](docs/SPEC.md).
 
 ## Tools
 
@@ -102,4 +102,4 @@ This model runs locally and uses shared service credentials, so whoever has the 
 
 ## Not verified against live APIs
 
-All read tools (CRM, Cliq, WorkDrive, DB, Sign, Projects) have been run against real IRIS credentials. Still unconfirmed: Projects task comments (returned empty on the one task tried) and the Postgres audit sink (only the file sink and in-memory sinks are covered by tests).
+All read tools, the Postgres audit sink, the remote login and the Level A and B write tools have been run against real IRIS systems. Delete attempts with the write tokens fail in CRM, Projects, WorkDrive and Cliq. Still not covered by a live test: more than one non-admin user connecting at the same time, and the remote server's behavior under load.

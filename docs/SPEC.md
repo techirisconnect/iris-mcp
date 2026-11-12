@@ -1,6 +1,6 @@
 # LAB-654 — MCP de IRIS: especificación
 
-Estado: acordada el 2026-11-11 (lista de escritura confirmada por Joaquín). La v0.1 actual es local y de solo lectura; este documento define la versión completa.
+Estado: acordada el 2026-11-11 (lista de escritura confirmada por Joaquín). Estado al 2026-11-12: implementada (servidor remoto, auditoría, 6 fuentes, escritura Nivel A y B sin borrado); ver §9 para lo que falta cerrar. Este documento define la versión completa.
 
 ## 1. Objetivo
 
@@ -95,14 +95,14 @@ Los logs se guardan en una tabla de la base y se pueden consultar con una tool d
 
 ## 9. Criterios de aceptación
 
-- [ ] Conectado a las 6 fuentes.
-- [ ] Lee y escribe según §4; cualquier intento de borrar falla (con la prueba de §5 hecha en cada sistema).
-- [ ] Desplegado y conectable desde Claude por el equipo.
-- [ ] Logs consultables de todas las acciones.
-- [ ] Guía corta de instalación y conexión.
+- [x] Conectado a las 6 fuentes (probado en vivo, 2026-11-11).
+- [x] Lee y escribe según §4 (Nivel A y B probados contra Zoho real, 2026-11-12). Prueba de borrado hecha en cada sistema con los tokens de escritura: CRM (`OAUTH_SCOPE_MISMATCH`), Projects (`Invalid OAuth scope`), WorkDrive (borrar y papelera: `Invalid OAuth scope`), Cliq (`oauthtoken_scope_invalid`). Falla en todos.
+- [ ] Desplegado y conectable desde Claude por el equipo (desplegado y probado con `tech@`; falta que lo pruebe otra persona del equipo y la aprobación del conector a nivel organización).
+- [x] Logs consultables de todas las acciones (`audit_query`, tabla `mcp_audit_log`; las escrituras guardan el contenido y, en el Nivel B, el valor anterior y el nuevo).
+- [x] Guía corta de instalación y conexión (`INSTALL.md`).
 
 ## 10. Decisiones abiertas
 
 - **Plan de Claude:** confirmar que permite conectores remotos personalizados para todo el equipo y quién es administrador (consultado en Jira).
-- **Residencia de datos:** Render en Oregon y Supabase en us-east-2 están fuera de Canadá; el MCP hace pasar más datos por ahí. Decisión de Jhony junto con SCRUM-201.
-- **Clave de `postgres` de Supabase:** quedó expuesta; resetear antes de habilitar escritura.
+- **Residencia de datos:** Render en Oregon y Supabase en us-east-2 están fuera de Canadá; el MCP hace pasar más datos por ahí. Decisión provisional (2026-11-12): seguir con los datos en Oregon; queda pendiente la decisión formal de Jhony junto con SCRUM-201.
+- **Clave de `postgres` de Supabase:** rotarla antes de dar acceso al equipo (pedido a quien tiene los permisos). El MCP no la usa; usa roles propios con permisos mínimos.
