@@ -107,6 +107,19 @@ test("server instructions tell Claude not to describe the structure", async () =
   const instructions = (await connect()).getInstructions();
   assert.match(instructions, /Never describe/);
   assert.match(instructions, /table or column names/);
+  assert.match(instructions, /database engine/);
+  assert.match(instructions, /administrator/);
+});
+
+test("extra instructions from the environment are appended, never replace the base rules", async () => {
+  process.env.IRIS_MCP_EXTRA_INSTRUCTIONS = "Answer in Spanish.";
+  try {
+    const text = (await connect()).getInstructions();
+    assert.match(text, /Never describe/);
+    assert.ok(text.endsWith("Answer in Spanish."));
+  } finally {
+    delete process.env.IRIS_MCP_EXTRA_INSTRUCTIONS;
+  }
 });
 
 test("zoho tools fail cleanly when not configured", async () => {

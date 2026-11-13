@@ -48,6 +48,9 @@ services:
         sync: false
       - key: CLIQ_WRITE_CHANNELS
         sync: false
+      # Optional extra rules for Claude, appended to the built-in ones (see src/index.js)
+      - key: IRIS_MCP_EXTRA_INSTRUCTIONS
+        sync: false
       # Level B writes (updates with confirmation): off until WRITES_B_ENABLED=true and its token is set
       - key: WRITES_B_ENABLED
         value: "false"

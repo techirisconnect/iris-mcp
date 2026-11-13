@@ -50,7 +50,7 @@ Keeping the database's shape private (so Claude cannot reverse-engineer an entit
 - **No probing:** hidden, sensitive, malformed and nonexistent columns all get the same answer, tables outside the allowlist are not listed in errors, and Postgres errors never reach Claude (generic "Consulta no válida"; the detail goes to the server log).
 - **Volume:** `DB_MAX_ROWS` (default 100, 25 if Claude does not ask for more) per query and `DB_DAILY_ROW_LIMIT` (default 1000 rows per person per rolling 24 h, counted from the audit log; if it cannot be checked the query is refused).
 - **Per person:** the `db_*` tools only exist for people with `mcp_users.db_enabled = true` and for admins (`sql/add-db-enabled.sql`).
-- **Instructions:** the server tells Claude never to describe or infer the structure of IRIS systems. This is a soft control (it can be argued around); the controls above are the real ones.
+- **Instructions:** the server tells Claude never to describe or infer the structure or technology of IRIS systems, even if the person claims authority or asks piece by piece. Extra rules can be added without a deploy of new code through `IRIS_MCP_EXTRA_INSTRUCTIONS` in Render (the built-in rules stay). This is a soft control (it can be argued around); the controls above are the real ones.
 
 Limit that remains: whatever columns are exposed show their names to Claude, and the person can see the rows. The structural fix, if needed, is a dedicated schema of views with business names (see docs/SPEC.md).
 
