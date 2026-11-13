@@ -8,7 +8,8 @@ import { safe } from "../util.js";
 // database (hidden tables, hidden columns, relations, integration ids) from leaking.
 //
 // Config (all optional):
-//   DB_ALLOWED_TABLES     a,b,c   tables Claude can read
+//   DB_SCHEMA             name    schema to read (default public; "mcp" = the views of sql/create-mcp-views.sql)
+//   DB_ALLOWED_TABLES     a,b,c   tables or views Claude can read
 //   DB_EXPOSED_COLUMNS    JSON    {"table": ["col", ...]} whitelist; wins over the defaults below
 //   DB_MAX_ROWS           number  max rows per db_query (default 100)
 //   DB_DAILY_ROW_LIMIT    number  rows a person can read through db_query per rolling 24 h (default 1000, 0 = off)
@@ -20,6 +21,16 @@ const DEFAULT_TABLES = [
   "maintenance_requests",
   "property_tenant_waitlist",
 ];
+// Views in the "mcp" schema (sql/create-mcp-views.sql): joins resolved inside, business names, no internal ids.
+const DEFAULT_VIEWS = [
+  "properties",
+  "property_managers",
+  "leases",
+  "tenants",
+  "maintenance_requests",
+  "waitlist_candidates",
+];
+const SCHEMA_RE = /^[A-Za-z_][A-Za-z0-9_]{0,62}$/;
 const COLUMN_RE = /^[A-Za-z_][A-Za-z0-9_]{0,62}$/;
 const SENSITIVE_RE = /pass(word)?|token|secret|hash|api_?key/i;
 // Columns that reveal how IRIS is wired to other systems; hidden unless DB_EXPOSED_COLUMNS lists them.
@@ -38,8 +49,17 @@ const NOT_AVAILABLE_TABLE = "Tabla no disponible";
 const NOT_AVAILABLE_COLUMN = "Consulta no válida: columna no disponible";
 const GENERIC = "Consulta no válida";
 
+/** Schema the tools read from: DB_SCHEMA (default public; use "mcp" for the views). */
+export const dbSchema = () => {
+  const s = process.env.DB_SCHEMA || "public";
+  if (!SCHEMA_RE.test(s)) throw new UserError(GENERIC);
+  return s;
+};
+
 export const allowedTables = () =>
-  (process.env.DB_ALLOWED_TABLES ? process.env.DB_ALLOWED_TABLES.split(",") : DEFAULT_TABLES)
+  (process.env.DB_ALLOWED_TABLES
+    ? process.env.DB_ALLOWED_TABLES.split(",")
+    : process.env.DB_SCHEMA && process.env.DB_SCHEMA !== "public" ? DEFAULT_VIEWS : DEFAULT_TABLES)
     .map((t) => t.trim())
     .filter(Boolean);
 
@@ -108,27 +128,29 @@ export function visibleColumns({ readable, foreignKeys = [], exposed }) {
 
 const columnCache = new Map();
 async function tableColumns(table) {
-  if (columnCache.has(table)) return columnCache.get(table);
+  const schema = dbSchema();
+  const key = `${schema}.${table}`;
+  if (columnCache.has(key)) return columnCache.get(key);
   const pool = db();
   // Columns the role may read (column-level grants hide the rest).
   const readable = (await pool.query(
     `SELECT column_name FROM information_schema.columns
-      WHERE table_schema = 'public' AND table_name = $1
-        AND has_column_privilege(current_user, format('public.%I', table_name), column_name, 'SELECT')
+      WHERE table_schema = $1 AND table_name = $2
+        AND has_column_privilege(current_user, format('%I.%I', table_schema, table_name), column_name, 'SELECT')
       ORDER BY ordinal_position`,
-    [table],
+    [schema, table],
   )).rows.map((r) => r.column_name);
-  // Foreign-key columns would let Claude draw the relations between tables.
+  // Foreign-key columns would let Claude draw the relations between tables (views have none).
   const foreignKeys = (await pool.query(
     `SELECT a.attname AS column_name
        FROM pg_constraint c
        JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
-      WHERE c.contype = 'f' AND c.conrelid = format('public.%I', $1::text)::regclass`,
-    [table],
+      WHERE c.contype = 'f' AND c.conrelid = format('%I.%I', $1::text, $2::text)::regclass`,
+    [schema, table],
   )).rows.map((r) => r.column_name);
   const cols = visibleColumns({ readable, foreignKeys, exposed: exposedConfig()[table] });
   if (!cols.length) throw new UserError(NOT_AVAILABLE_TABLE);
-  columnCache.set(table, cols);
+  columnCache.set(key, cols);
   return cols;
 }
 
@@ -171,7 +193,7 @@ export function buildSelect({ table, columns, filters, order_by, ascending, limi
   const { sql: where, values } = buildWhere(filters);
   const order = order_by ? ` ORDER BY ${q(order_by)} ${ascending ? "ASC" : "DESC"}` : "";
   return {
-    text: `SELECT ${columns.map(q).join(", ")} FROM public.${q(table)}${where}${order} LIMIT ${Number(limit)}`,
+    text: `SELECT ${columns.map(q).join(", ")} FROM ${q(dbSchema())}.${q(table)}${where}${order} LIMIT ${Number(limit)}`,
     values,
   };
 }
@@ -255,7 +277,7 @@ export function registerDb(server, { usage } = {}) {
       checkTable(table);
       await checkVisible(table, filters.map((f) => f.column));
       const { sql, values } = buildWhere(filters);
-      const { rows } = await db().query(`SELECT count(*)::int AS count FROM public.${q(table)}${sql}`, values);
+      const { rows } = await db().query(`SELECT count(*)::int AS count FROM ${q(dbSchema())}.${q(table)}${sql}`, values);
       return { table, count: rows[0].count };
     }),
   );

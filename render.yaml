@@ -48,6 +48,9 @@ services:
         sync: false
       - key: CLIQ_WRITE_CHANNELS
         sync: false
+      # Schema the db tools read: "mcp" = views (sql/create-mcp-views.sql), empty/public = real tables
+      - key: DB_SCHEMA
+        sync: false
       # Optional extra rules for Claude, appended to the built-in ones (see src/index.js)
       - key: IRIS_MCP_EXTRA_INSTRUCTIONS
         sync: false

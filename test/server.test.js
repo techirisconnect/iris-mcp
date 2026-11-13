@@ -151,9 +151,29 @@ test("buildSelect parameterizes values and quotes identifiers", async () => {
   });
   assert.equal(
     text,
-    'SELECT "id", "city" FROM public."properties" WHERE "city" ILIKE $1 AND "id" = ANY($2) AND "furnished" IS NULL ORDER BY "created_at" DESC LIMIT 10',
+    'SELECT "id", "city" FROM "public"."properties" WHERE "city" ILIKE $1 AND "id" = ANY($2) AND "furnished" IS NULL ORDER BY "created_at" DESC LIMIT 10',
   );
   assert.deepEqual(values, ["vic%'; drop table x;--", ["a", "b"]]);
+});
+
+test("DB_SCHEMA switches the schema and the default list to the mcp views", async () => {
+  const { buildSelect, allowedTables, dbSchema } = await import("../src/tools/db.js");
+  const saved = { s: process.env.DB_SCHEMA, t: process.env.DB_ALLOWED_TABLES };
+  delete process.env.DB_ALLOWED_TABLES;
+  process.env.DB_SCHEMA = "mcp";
+  try {
+    assert.equal(dbSchema(), "mcp");
+    assert.ok(allowedTables().includes("waitlist_candidates"));
+    assert.ok(!allowedTables().includes("rental_managers"), "real table names are not in the view list");
+    const { text } = buildSelect({ table: "leases", columns: ["code"], filters: [], limit: 5 });
+    assert.equal(text, 'SELECT "code" FROM "mcp"."leases" LIMIT 5');
+    process.env.DB_SCHEMA = 'mcp"; drop table x;--';
+    assert.throws(() => dbSchema(), /Consulta no válida/);
+  } finally {
+    for (const [k, v] of [["DB_SCHEMA", saved.s], ["DB_ALLOWED_TABLES", saved.t]]) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  }
 });
 
 test("db tools fail cleanly without DATABASE_URL_READONLY", async () => {
