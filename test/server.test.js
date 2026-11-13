@@ -176,6 +176,30 @@ test("DB_SCHEMA switches the schema and the default list to the mcp views", asyn
   }
 });
 
+test("db_list_tables describes each view so Claude does not sample rows to find columns", async () => {
+  const saved = { s: process.env.DB_SCHEMA, t: process.env.DB_ALLOWED_TABLES, u: process.env.DATABASE_URL_READONLY };
+  delete process.env.DB_ALLOWED_TABLES;
+  delete process.env.DATABASE_URL_READONLY; // no database: names and descriptions still come back
+  process.env.DB_SCHEMA = "mcp";
+  try {
+    const r = await (await connect()).callTool({ name: "db_list_tables", arguments: {} });
+    assert.equal(r.isError, undefined);
+    const list = JSON.parse(r.content[0].text);
+    assert.equal(list.length, 6);
+    assert.match(list.find((t) => t.table === "leases").description, /tenant_name/);
+  } finally {
+    for (const [k, v] of [["DB_SCHEMA", saved.s], ["DB_ALLOWED_TABLES", saved.t], ["DATABASE_URL_READONLY", saved.u]]) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  }
+});
+
+test("instructions ask Claude to search every relevant source instead of asking", async () => {
+  const text = (await connect()).getInstructions();
+  assert.match(text, /Be proactive/);
+  assert.match(text, /do not stop to ask whether to also check another source/);
+});
+
 test("db tools fail cleanly without DATABASE_URL_READONLY", async () => {
   delete process.env.DATABASE_URL_READONLY;
   const r = await (await connect()).callTool({ name: "db_count", arguments: { table: "properties" } });

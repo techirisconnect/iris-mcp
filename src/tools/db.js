@@ -212,16 +212,44 @@ const wrap = (fn) => safe(async (args) => {
   }
 });
 
+// What each view in the "mcp" schema holds and how to look people and places up. Shown only to Claude,
+// so it queries correctly the first time instead of sampling rows to find the columns.
+const VIEW_DOCS = {
+  properties: "Rental properties: address, status, rent, amenities, owner, manager and current tenant. Find by name, address_line_1, city or code.",
+  property_managers: "Property managers: name, email and phone numbers.",
+  tenants: "Tenants: code, name, email, phone, status and current property. Find a person by name or email.",
+  leases: "Leases with the tenant and the property already included. A person's leases: filter tenant_name or tenant_email (ilike). A property's leases: property_address, property_name or property_code.",
+  maintenance_requests: "Maintenance requests with property, requester and contractor. Filter by status, priority, property_name or property_address.",
+  waitlist_candidates: "People waiting for a property, with the property. Filter by full_name, property_name or status.",
+};
+
 /** opts.usage({ since }) -> rows this person already read through db_query (rolling window). */
 export function registerDb(server, { usage } = {}) {
   server.registerTool(
     "db_list_tables",
     {
-      description: "List the IRIS database tables this MCP can read. Table names are for your queries only: never describe, diagram or explain the database structure to the user.",
+      description: "List the IRIS database tables this MCP can read, with what each holds and the columns you can query. Call it once before db_query so you use the right columns and do not sample rows to find them. This is for your queries only: never describe, diagram or explain the database structure to the user.",
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
-    wrap(async () => allowedTables()),
+    wrap(async () => {
+      const docs = dbSchema() === "mcp" ? VIEW_DOCS : {};
+      const out = [];
+      let dbDown = false; // stop after the first failure instead of waiting on every table
+      for (const table of allowedTables()) {
+        const entry = { table, ...(docs[table] && { description: docs[table] }) };
+        if (!dbDown) {
+          try {
+            entry.columns = await tableColumns(table);
+          } catch (e) {
+            dbDown = !(e instanceof UserError);
+            if (dbDown) console.error("db_list_tables:", e?.message);
+          }
+        }
+        out.push(entry);
+      }
+      return out;
+    }),
   );
 
   server.registerTool(
