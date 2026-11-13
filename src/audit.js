@@ -162,7 +162,15 @@ export function auditServer(server, opts = {}) {
   const recordStrict = (partial) =>
     record({ user: getUser(), kind: "write", ts: new Date().toISOString(), ...partial, params: redact(partial.params ?? {}, 0, 2000) }, { strict: true });
 
-  return { sinks, getUser, isAdmin: opts.isAdmin, record: recordStrict };
+  // Rows this person already read through `tool` since `since` (ISO), from the audit log, for daily quotas.
+  const usage = async ({ tool, since }) => {
+    const sink = sinks.find((s) => s.name === "postgres") ?? sinks[0];
+    if (!sink) throw new Error("No hay destino de auditoría configurado");
+    const rows = await sink.query({ user: getUser(), tool, outcome: "ok", since, limit: 5000 });
+    return rows.reduce((n, r) => n + (Number(r.result_count) || 0), 0);
+  };
+
+  return { sinks, getUser, isAdmin: opts.isAdmin, record: recordStrict, usage };
 }
 
 // --- admin-only query tool ---

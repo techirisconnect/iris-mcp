@@ -71,6 +71,13 @@ insert into public.mcp_users (email) values ('persona@irisproperties.ca');
 update public.mcp_users set revoked_at = now() where email = 'persona@irisproperties.ca';
 ```
 
+**Acceso a la base de datos por persona:** las herramientas de la base (`db_*`) solo existen para quien tiene `db_enabled = true` y para los administradores. Las demás fuentes (CRM, Cliq, WorkDrive, Sign, Projects) no dependen de este permiso. Se activa y se quita así (corre en la siguiente consulta):
+
+```sql
+update public.mcp_users set db_enabled = true  where email = 'persona@irisproperties.ca';
+update public.mcp_users set db_enabled = false where email = 'persona@irisproperties.ca';
+```
+
 **Ver qué hizo alguien:** un administrador le pide a Claude *"consultá el log de auditoría con audit_query"* (filtra por usuario, herramienta, resultado y fecha). Los administradores son los de `ADMIN_EMAILS`.
 
 **Escritura:** se activa con `WRITES_ENABLED=true` y el token `Z_WRITE_REFRESH_TOKEN` (solo permisos de crear). Cliq solo publica en los canales de `CLIQ_WRITE_CHANNELS`. Para apagarla, poné `WRITES_ENABLED=false` y redeployá. Las modificaciones con confirmación (Nivel B) tienen su propio interruptor `WRITES_B_ENABLED`, su token `Z_WRITE_B_REFRESH_TOKEN` y `CONFIRM_SECRET` (firma las confirmaciones).

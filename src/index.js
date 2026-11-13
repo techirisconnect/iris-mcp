@@ -20,15 +20,28 @@ dotenv.config({
   quiet: true,
 });
 
-/** opts: { user, sinks } — user comes from the authenticated session once the server is remote. */
+// Soft control: it steers Claude's behaviour, it does not enforce anything. The real limits are
+// the database role, the column filters in tools/db.js and the per-user switches.
+export const INSTRUCTIONS = [
+  "You give IRIS staff access to company data (CRM, Cliq, WorkDrive, Sign, Projects, database).",
+  "Use the tools only to answer the person's business question and show them the data they asked for.",
+  "Never describe, list, diagram or infer the structure of IRIS systems: no table or column names, relations or entity-relationship diagrams, internal ids, integration ids, API field names, or how the systems are connected.",
+  "If asked about the database design or architecture, say you cannot share it and that technology can help. Do not try to discover hidden tables or columns by probing, guessing names or testing errors.",
+  "Do not repeat internal ids unless the person needs them for the task. Read only what the question needs.",
+].join("\n");
+
+/**
+ * opts: { user, sinks, isAdmin, dbEnabled } — user comes from the authenticated session once the
+ * server is remote. dbEnabled (default true) decides whether the database tools exist at all.
+ */
 export function createServer(opts = {}) {
-  const server = new McpServer({ name: "iris", version: "0.2.0" });
+  const server = new McpServer({ name: "iris", version: "0.2.0" }, { instructions: INSTRUCTIONS });
   const audit = auditServer(server, opts); // must run before any registerTool
   registerAuditQuery(server, audit);
   registerCrm(server);
   registerCliq(server);
   registerWorkDrive(server);
-  registerDb(server);
+  if (opts.dbEnabled !== false) registerDb(server, { usage: ({ since }) => audit.usage({ tool: "db_query", since }) });
   registerSign(server);
   registerProjects(server);
   // Write tools exist only when explicitly enabled (and use a separate write token).

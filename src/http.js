@@ -43,8 +43,8 @@ export function createApp({ provider, baseUrl, sinks }) {
 
   // Stateless: a fresh server per request, bound to the authenticated user.
   app.post("/mcp", express.json({ limit: "1mb" }), bearer, async (req, res) => {
-    const { email, isAdmin } = req.auth.extra;
-    const server = createServer({ user: email, isAdmin: () => isAdmin === true, ...(sinks && { sinks }) });
+    const { email, isAdmin, dbEnabled } = req.auth.extra;
+    const server = createServer({ user: email, isAdmin: () => isAdmin === true, dbEnabled: dbEnabled === true, ...(sinks && { sinks }) });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     res.on("close", () => { transport.close(); server.close(); });
     try {

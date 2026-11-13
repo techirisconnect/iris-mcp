@@ -181,7 +181,12 @@ export class IrisOAuthProvider {
     return {
       token, clientId: row.clientId, scopes: row.scopes, expiresAt: Math.floor(row.expiresAt / 1000),
       resource: row.resource ? new URL(row.resource) : undefined,
-      extra: { email: row.email, isAdmin: !!user.is_admin || this.adminEmails.has(row.email) },
+      extra: {
+        email: row.email,
+        isAdmin: !!user.is_admin || this.adminEmails.has(row.email),
+        // Database tools are opt-in per person (mcp_users.db_enabled); admins always have them.
+        dbEnabled: !!user.is_admin || this.adminEmails.has(row.email) || !!user.db_enabled,
+      },
     };
   }
 

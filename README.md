@@ -43,7 +43,16 @@ They use a second token (`Z_WRITE_B_REFRESH_TOKEN`: leads/contacts UPDATE and CR
 
 Every tool call is recorded: who, when, tool, system, read/write, parameters (secret-looking keys redacted), outcome, result count and duration. **Data that was read is never stored.** Entries go to `logs/audit.jsonl` (git-ignored, override with `AUDIT_LOG_FILE`) and, if `AUDIT_DATABASE_URL` is set, to the Postgres table `mcp_audit_log` (`sql/create-audit-table.sql`; the role can insert and select, never update or delete). Future write tools are fail-closed: if the audit entry can't be stored, the action doesn't run. `audit_query` is admin-only: in remote mode admins are the emails in `ADMIN_EMAILS` (or `is_admin` in `mcp_users`), decided by the login; in local mode it uses `AUDIT_ADMINS` and the user is self-declared (`IRIS_USER` or the OS user), so it is not a real control there.
 
-Database guardrails: the server connects with a Postgres role that only has `SELECT` (see `sql/create-readonly-role.sql`), sessions are read-only with a 10 s statement timeout, and on top of that only tables in the allowlist (`DB_ALLOWED_TABLES`, default `properties, rental_managers, leases, tenants, maintenance_requests, property_tenant_waitlist`); columns matching `password|token|secret|hash|api_key` are never read or returned; max 200 rows per query.
+Database guardrails: the server connects with a Postgres role that only has `SELECT` (see `sql/create-readonly-role.sql`), sessions are read-only with a 10 s statement timeout, and on top of that only tables in the allowlist (`DB_ALLOWED_TABLES`, default `properties, rental_managers, leases, tenants, maintenance_requests, property_tenant_waitlist`); columns matching `password|token|secret|hash|api_key` are never read or returned.
+
+Keeping the database's shape private (so Claude cannot reverse-engineer an entity-relationship diagram):
+- **Exposed columns:** by default a table shows only its readable columns minus sensitive names, integration ids (`zoho`, `buildium`, `desk_`, `vendor`, `ticket`...), reference columns (`*_id`, `*_by`, `assigned_to`) and declared foreign keys. `DB_EXPOSED_COLUMNS` (JSON per table) replaces that with an explicit whitelist. No `SELECT *` of hidden columns is possible and filters or ordering by a hidden column are refused.
+- **No probing:** hidden, sensitive, malformed and nonexistent columns all get the same answer, tables outside the allowlist are not listed in errors, and Postgres errors never reach Claude (generic "Consulta no válida"; the detail goes to the server log).
+- **Volume:** `DB_MAX_ROWS` (default 100, 25 if Claude does not ask for more) per query and `DB_DAILY_ROW_LIMIT` (default 1000 rows per person per rolling 24 h, counted from the audit log; if it cannot be checked the query is refused).
+- **Per person:** the `db_*` tools only exist for people with `mcp_users.db_enabled = true` and for admins (`sql/add-db-enabled.sql`).
+- **Instructions:** the server tells Claude never to describe or infer the structure of IRIS systems. This is a soft control (it can be argued around); the controls above are the real ones.
+
+Limit that remains: whatever columns are exposed show their names to Claude, and the person can see the rows. The structural fix, if needed, is a dedicated schema of views with business names (see docs/SPEC.md).
 
 ## Remote mode (per-person login)
 

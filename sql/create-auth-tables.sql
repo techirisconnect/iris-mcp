@@ -6,7 +6,8 @@ create table if not exists public.mcp_users (
   email         text primary key,            -- lowercase
   name          text,
   is_admin      boolean not null default false,
-  revoked_at    timestamptz,                 -- set = access cut off immediately
+  db_enabled    boolean not null default false,  -- database tools (db_*) only for people with true; admins always have them
+  revoked_at   timestamptz,                 -- set = access cut off immediately
   created_at    timestamptz not null default now(),
   last_login_at timestamptz
 );

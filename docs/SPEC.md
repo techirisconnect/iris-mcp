@@ -105,4 +105,5 @@ Los logs se guardan en una tabla de la base y se pueden consultar con una tool d
 
 - **Plan de Claude:** confirmar que permite conectores remotos personalizados para todo el equipo y quién es administrador (consultado en Jira).
 - **Residencia de datos:** Render en Oregon y Supabase en us-east-2 están fuera de Canadá; el MCP hace pasar más datos por ahí. Decisión provisional (2026-11-12): seguir con los datos en Oregon; queda pendiente la decisión formal de Jhony junto con SCRUM-201.
+- **Estructura de la base:** controles hechos el 2026-11-13 (columnas de referencia e integración ocultas, errores genéricos, límites de filas, `db_enabled` por persona, instrucciones al modelo). Pendiente si se necesita más: esquema `mcp` con vistas en lenguaje de negocio y sin ids internos; el rol dejaría de leer `public`. Requiere que Jhony defina qué datos y columnas necesita el equipo.
 - **Clave de `postgres` de Supabase:** rotarla antes de dar acceso al equipo (pedido a quien tiene los permisos). El MCP no la usa; usa roles propios con permisos mínimos.

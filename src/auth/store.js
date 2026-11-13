@@ -123,17 +123,17 @@ export function pgStore(url = process.env.AUTH_DATABASE_URL) {
       await pool.query("UPDATE public.mcp_oauth_tokens SET revoked_at = now() WHERE email = $1 AND revoked_at IS NULL", [email]);
     },
     async getUser(email) {
-      const r = await one("SELECT email, name, is_admin, revoked_at FROM public.mcp_users WHERE email = $1", [email]);
-      return r && { email: r.email, name: r.name, is_admin: r.is_admin, revoked: !!r.revoked_at };
+      const r = await one("SELECT email, name, is_admin, db_enabled, revoked_at FROM public.mcp_users WHERE email = $1", [email]);
+      return r && { email: r.email, name: r.name, is_admin: r.is_admin, db_enabled: r.db_enabled, revoked: !!r.revoked_at };
     },
     async upsertUser(u) {
       const r = await one(
         `INSERT INTO public.mcp_users (email, name, is_admin, last_login_at) VALUES ($1,$2,$3, now())
          ON CONFLICT (email) DO UPDATE SET name = COALESCE(EXCLUDED.name, public.mcp_users.name), last_login_at = now()
-         RETURNING email, name, is_admin, revoked_at`,
+         RETURNING email, name, is_admin, db_enabled, revoked_at`,
         [u.email, u.name ?? null, !!u.is_admin],
       );
-      return { email: r.email, name: r.name, is_admin: r.is_admin, revoked: !!r.revoked_at };
+      return { email: r.email, name: r.name, is_admin: r.is_admin, db_enabled: r.db_enabled, revoked: !!r.revoked_at };
     },
   };
 }

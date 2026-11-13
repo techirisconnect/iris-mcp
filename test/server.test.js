@@ -40,15 +40,73 @@ test("exposes the CRM, Cliq, WorkDrive, DB, Sign and Projects tools", async () =
 test("db_query rejects tables outside the allowlist", async () => {
   const r = await (await connect()).callTool({ name: "db_query", arguments: { table: "users" } });
   assert.equal(r.isError, true);
-  assert.match(r.content[0].text, /no permitida/);
+  assert.match(r.content[0].text, /Tabla no disponible/);
+  assert.ok(!r.content[0].text.includes("properties"), "must not list the allowed tables");
 });
 
-test("db_query rejects sensitive columns", async () => {
-  const r = await (await connect()).callTool({
-    name: "db_query", arguments: { table: "tenants", columns: ["password_hash"] },
-  });
-  assert.equal(r.isError, true);
-  assert.match(r.content[0].text, /sensible/);
+test("db_query gives the same answer for sensitive and malformed column names", async () => {
+  const client = await connect();
+  const texts = [];
+  for (const col of ["password_hash", "access token"]) {
+    const r = await client.callTool({ name: "db_query", arguments: { table: "tenants", columns: [col] } });
+    assert.equal(r.isError, true);
+    texts.push(r.content[0].text);
+  }
+  assert.equal(texts[0], texts[1]);
+  assert.match(texts[0], /columna no disponible/);
+});
+
+test("database errors never reach Claude with table or column names", async () => {
+  const saved = process.env.DATABASE_URL_READONLY;
+  process.env.DATABASE_URL_READONLY = "postgres://u:p@127.0.0.1:1/none"; // refuses connections
+  try {
+    const r = await (await connect()).callTool({ name: "db_count", arguments: { table: "tenants", filters: [{ column: "status", op: "eq", value: "x" }] } });
+    assert.equal(r.isError, true);
+    assert.equal(r.content[0].text, "Error: Consulta no válida");
+  } finally {
+    if (saved === undefined) delete process.env.DATABASE_URL_READONLY; else process.env.DATABASE_URL_READONLY = saved;
+  }
+});
+
+test("visibleColumns hides sensitive, integration and foreign-key columns unless whitelisted", async () => {
+  const { visibleColumns } = await import("../src/tools/db.js");
+  const readable = ["id", "name", "manager_id", "zoho_contact_id", "desk_ticket_id", "rent_amount", "api_key", "created_at", "property_id", "created_by", "assigned_to", "owner"];
+  assert.deepEqual(
+    visibleColumns({ readable, foreignKeys: ["owner"] }),
+    ["id", "name", "rent_amount", "created_at"], // `owner` hidden only because it is a declared FK here
+  );
+  // A whitelist wins over the defaults but never re-enables sensitive names or unreadable columns.
+  assert.deepEqual(
+    visibleColumns({ readable, foreignKeys: ["manager_id"], exposed: ["name", "manager_id", "api_key", "not_there"] }),
+    ["name", "manager_id"],
+  );
+});
+
+test("db_query enforces the daily row limit before touching the database", async () => {
+  process.env.DB_DAILY_ROW_LIMIT = "100";
+  try {
+    const sink = memorySink([
+      { user: "ana@iris.ca", tool: "db_query", outcome: "ok", result_count: 100, ts: new Date().toISOString() },
+    ]);
+    const client = await connect({ sinks: [sink], user: "ana@iris.ca" });
+    const r = await client.callTool({ name: "db_query", arguments: { table: "tenants" } });
+    assert.equal(r.isError, true);
+    assert.match(r.content[0].text, /límite diario/);
+  } finally {
+    delete process.env.DB_DAILY_ROW_LIMIT;
+  }
+});
+
+test("database tools are absent for people without db access", async () => {
+  const { tools } = await (await connect({ sinks: [memorySink()], user: "mkt@iris.ca", dbEnabled: false })).listTools();
+  assert.ok(!tools.some((t) => t.name.startsWith("db_")));
+  assert.ok(tools.some((t) => t.name === "crm_search_records"), "other sources stay available");
+});
+
+test("server instructions tell Claude not to describe the structure", async () => {
+  const instructions = (await connect()).getInstructions();
+  assert.match(instructions, /Never describe/);
+  assert.match(instructions, /table or column names/);
 });
 
 test("zoho tools fail cleanly when not configured", async () => {
